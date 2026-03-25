@@ -1,0 +1,91 @@
+services:
+  db:
+    image: postgres:18.3-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${PGDATABASE}
+      - POSTGRES_USER=${PGUSER}
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_secret
+    secrets:
+      - db_secret
+    expose:
+      - "5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PGUSER} -d ${PGDATABASE} -h localhost -p ${PGPORT}"]
+      interval: 2s
+      timeout: 10s
+      retries: 5
+      start_period: 30s 
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        
+
+  backend:
+    build: 
+      context: ./api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - PGHOST=${PGHOST}
+      - PGPORT=${PGPORT}
+      - PGDATABASE=${PGDATABASE}
+      - PGUSER=${PGUSER}
+      - PGPASSWORD_FILE=/run/secrets/db_secret
+    secrets:
+      - db_secret
+    depends_on:
+      - db
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/"]
+      interval: 2s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    
+  frontend:
+    build: 
+      context: ./front
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "80:8080"
+    depends_on:
+      - backend
+    networks:
+      - frontend
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/"]
+      interval: 2s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - ./front/nginx_data/nginx.conf:/etc/nginx/nginx.conf:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+  
+
+volumes:
+  db_data:
+secrets:
+  db_secret:
+    file: ./secrets/db_secret.txt
+
+
+
+networks:
+  backend:
+  frontend:
