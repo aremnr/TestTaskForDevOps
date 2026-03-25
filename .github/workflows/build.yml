@@ -9,8 +9,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  FRONTEND_IMAGE: ${{ github.repository }}-frontend
-  BACKEND_IMAGE: ${{ github.repository }}-backend
 
 jobs:
   build-and-push:
@@ -22,6 +20,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Prepare image names
+        run: |
+          REPO_LOWER="${GITHUB_REPOSITORY,,}"
+          echo "FRONTEND_IMAGE=${REPO_LOWER}-frontend" >> $GITHUB_ENV
+          echo "BACKEND_IMAGE=${REPO_LOWER}-backend" >> $GITHUB_ENV
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -36,22 +40,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # FRONTEND (amd64 и arm64)
       - name: Build and push Frontend
         uses: docker/build-push-action@v5
         with:
-          context: ./front
+          context: ./frontend
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:latest
             ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
 
-      # BACKEND (amd64 и arm64)
       - name: Build and push Backend
         uses: docker/build-push-action@v5
         with:
-          context: ./api
+          context: ./backend
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
